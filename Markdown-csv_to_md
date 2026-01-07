@@ -1,0 +1,96 @@
+import csv
+import os
+from collections import Counter
+
+# Force le répertoire de travail à être celui où se trouve le script
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+def interpret_flags(packet_info):
+    """Traduit les drapeaux TCP en texte compréhensible pour le rapport."""
+    if "Flags [S]" in packet_info: return "Requête de connexion (SYN)"
+    if "Flags [P.]" in packet_info: return "Transfert de données (PUSH-ACK)"
+    if "Flags [.]" in packet_info: return "Accusé de réception (ACK)"
+    if "Flags [R]" in packet_info: return "Connexion refusée (RST)"
+    if "ICMP" in packet_info: return "Ping / Diagnostic réseau"
+    return "Autre protocole"
+
+def generate_final_report(input_csv, output_md):
+    try:
+        if not os.path.exists(input_csv):
+            print(f"Erreur : le fichier {input_csv} est introuvable.")
+            return
+
+        with open(input_csv, 'r', encoding='utf-8') as f:
+            # Utilisation du délimiteur ';' selon le format CSV/Excel habituel
+            reader = csv.DictReader(f, delimiter=';')
+            packets = list(reader)
+
+        if not packets:
+            print("Erreur : le fichier CSV est vide.")
+            return
+
+        # --- ANALYSE AVANCÉE ---
+
+        # 1. Analyse détaillée SSH (vérifie la présence de .ssh ou du port 22 dans la destination)
+        ssh_sources = [p['Source'] for p in packets if '.ssh' in p['Destination'] or '.22' in p['Destination']]
+        ssh_counts = Counter(ssh_sources)
+
+        # 2. Détection de scan de ports (compte le nombre de ports de destination uniques)
+        dest_ports = [p['Destination'].split('.')[-1] for p in packets]
+        unique_dest_ports = len(set(dest_ports))
+
+        # 3. Trafic ICMP (Ping)
+        icmp_packets = [p for p in packets if "ICMP" in p['Packet_Info']]
+
+        # --- GÉNÉRATION DU RAPPORT MARKDOWN ---
+        with open(output_md, 'w', encoding='utf-8') as md:
+            md.write("# 🛡️ Rapport global de sécurité réseau\n\n")
+
+            md.write("## 1. Menace critique : attaque SSH ciblée\n")
+            md.write("L’outil a identifié un schéma d’attaque multi-étapes provenant de `192.168.190.130` :\n")
+
+            if not ssh_counts:
+                md.write("- ✅ Aucune menace SSH spécifique détectée dans cet échantillon.\n")
+            else:
+                for source, count in ssh_counts.items():
+                    if count >= 60:
+                        md.write(f"- 🔴 **Assaut principal** : le port `{source}` a généré **{count} paquets**. Activité de force brute confirmée.\n")
+                    elif 4 <= count <= 10:
+                        md.write(f"- 🟠 **Test de connexion** : le port `{source}` a généré **{count} paquets** (vérification de service).\n")
+                    else:
+                        md.write(f"- 🟡 **Sonde discrète** : le port `{source}` a généré **{count} paquets**.\n")
+
+            md.write("\n## 2. Autres anomalies détectées\n")
+
+            # Alerte de scan de ports
+            if unique_dest_ports > 15:
+                md.write(f"- ⚠️ **Scan de ports** : l’hôte a sondé **{unique_dest_ports}** ports différents. Activité de reconnaissance détectée.\n")
+
+            # Alerte ICMP
+            if len(icmp_packets) > 50:
+                md.write(f"- ⚠️ **Flood ICMP** : {len(icmp_packets)} paquets Ping détectés. Risque potentiel de saturation réseau.\n")
+
+            # Alerte de volume de trafic
+            if len(packets) > 10000:
+                md.write(f"- ⚠️ **Volume de trafic élevé** : {len(packets)} paquets analysés au total. Risque possible de déni de service (DoS).\n")
+
+            md.write("\n## 3. Échantillon de trafic et interprétation\n")
+            md.write("| Horodatage | Source | Signification du drapeau | Résumé technique |\n")
+            md.write("| :--- | :--- | :--- | :--- |\n")
+
+            # Affiche les 40 premières lignes — en utilisant 'Timestamp' ou 'Heure' selon la colonne disponible
+            for p in packets[:40]:
+                # Utilisation de .get() pour éviter une erreur si le nom de colonne varie
+                time_val = p.get('Timestamp', p.get('Heure', 'N/A'))
+                info_val = p.get('Packet_Info', p.get('Info_Paquet', 'N/A'))
+
+                md.write(f"| {time_val} | {p['Source']} | **{interpret_flags(info_val)}** | {info_val[:55]}... |\n")
+
+        print(f"Succès ! Le rapport '{output_md}' a été généré avec succès.")
+
+    except Exception as e:
+        print(f"Erreur : {e}")
+
+if __name__ == "__main__":
+    # Nom exact du fichier d'entrée à utiliser
+    generate_final_report('Network_Analysis.csv', 'Network_Report.md')
