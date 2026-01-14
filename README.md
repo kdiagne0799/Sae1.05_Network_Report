@@ -10,238 +10,308 @@
 
 Ce projet a été réalisé dans le cadre de la **SAE 1.05 - Traiter des données** (BUT Réseaux & Télécommunications - Semestre 1) à l'IUT de Roanne.
 
-**Problématique :** Le réseau d'une entreprise sature. Parviendrez-vous à identifier pourquoi ?
+### Problématique
 
-### 🎯 Compétences visées
+Le réseau d'une entreprise (site en Inde) sature. Les vérifications classiques (Wireshark, tests réseau, configurations) n'ont rien donné. Il faut analyser un fichier `tcpdump` pour identifier les activités suspectes responsables de la saturation.
+
+### 🎯 Compétences visées (RT3)
 
 **Compétence RT3** : Créer des outils et applications informatiques pour les Réseaux & Télécommunications
 
 **Apprentissages critiques mobilisés :**
-- **AC03.11** : Utiliser un système informatique et ses outils
+- **AC03.11** : Utiliser un système informatique et ses outils (Python, Git, tcpdump)
 - **AC03.12** : Lire, exécuter, corriger et modifier un programme
 - **AC03.13** : Traduire un algorithme dans un langage et pour un environnement donné
-- **AC03.14** : Connaître l'architecture et les technologies d'un site Web
-- **AC03.15** : Choisir les mécanismes de gestion de données adaptés au développement de l'outil
-- **AC03.16** : S'intégrer dans un environnement propice au développement et au travail collaboratif
+- **AC03.14** : Connaître l'architecture et les technologies d'un site Web (Markdown → HTML)
+- **AC03.15** : Choisir les mécanismes de gestion de données adaptés (CSV, dictionnaires, listes)
+- **AC03.16** : S'intégrer dans un environnement propice au développement collaboratif (GitHub)
 
-### 📦 Livrables
+### 📦 Livrables attendus
 
 - ✅ Code Python hébergé sur GitHub
-- ✅ Notice d'utilisation en anglais (README)
+- ✅ Notice d'utilisation en anglais (ce README)
 - ✅ Présentation orale de 12 minutes avec démonstration
+- ✅ Traitement Excel du fichier CSV
 - ✅ Portfolio avec pièces justificatives
 
 ---
 
-## 📖 Overview
+## 📑 Table of contents
 
-**NetTrace Investigator** is a small Python toolchain designed to analyze raw network traces (exported from `tcpdump`) and produce a structured security report (Markdown → HTML). 
-
-The goal is to transform hard-to-read raw dumps into clear, actionable outputs highlighting suspicious behaviors and relevant indicators, helping network administrators identify security threats such as SSH brute force attacks, port scans, and SYN floods.
-
-This project was developed to investigate network saturation issues in a production environment by processing `tcpdump` logs when traditional analysis methods (Wireshark, configuration checks) failed to identify the root cause.
-
----
-
-## ⚙️ Key Features
-
-### 📊 Data preparation
-- Read a dump file (`DumpFile.txt` from `tcpdump` command).
-- Extract relevant fields: IP addresses, ports, timestamps, TCP flags, protocols.
-- Export clean structured data to CSV format (`Network_Analysis.csv`) for further analysis.
-
-### 🔍 Security analysis
-The tool detects common attack patterns using threshold-based heuristics:
-
-- **SSH Brute Force Detection**
-  - Threshold: More than **50 SSH connection attempts** (port 22) from a single source IP within a 5-minute window.
-  - Logic: Groups SSH packets by source IP and timestamp, flags IPs exceeding the threshold.
-
-- **Port Scan Detection**
-  - Threshold: A single source IP connects to **more than 20 different destination ports** on the same target.
-  - Logic: Analyzes unique (src_ip, dst_ip, dst_port) combinations to identify scanning behavior.
-
-- **SYN Flood Detection (DoS)**
-  - Threshold: More than **100 SYN packets** sent to a single destination IP within a short time frame.
-  - Logic: Counts TCP SYN flags per destination, identifies abnormal SYN rates indicating potential denial-of-service attacks.
-
-- **Unencrypted Traffic Detection**
-  - Identifies traffic on risky unencrypted ports: HTTP (80), Telnet (23), FTP (21).
-  - Recommends migration to secure alternatives (HTTPS, SSH, SFTP).
-
-- **Top Talkers Analysis**
-  - Lists most active IPs by packet count to identify bandwidth hogs or compromised hosts.
-
-### 📄 Reporting
-- Generate a detailed Markdown report (`Network_Report.md`) with:
-  - Executive summary of findings
-  - Detailed alerts with timestamps and IP addresses
-  - Traffic statistics and top talkers
-  - Recommendations for remediation
-- Convert Markdown to styled HTML page (`Network_Report.html`) for easy sharing and presentation.
+- [Professor Requirements Checklist](#-professor-requirements-checklist)
+- [Project Overview](#-project-overview)
+- [Prerequisites](#-prerequisites)
+- [Quick Install & Run](#-quick-install--run-pipeline)
+- [Scripts & File Descriptions](#-scripts--file-descriptions)
+- [Security Analysis - Detection Thresholds](#-security-analysis---detection-thresholds)
+- [Input / Output Formats](#-input--output-formats-and-examples)
+- [Excel Analysis](#-excel-analysis)
+- [Demo Preparation (12 min)](#-how-to-prepare-the-demo-presentation)
+- [Troubleshooting](#-troubleshooting)
+- [Testing & Fixtures](#-testing--fixtures)
+- [Contributing](#-contributing)
+- [License & Contact](#-license--contact)
 
 ---
 
-## 🔄 Pipeline
+## ✅ Professor requirements checklist
 
-```mermaid
-graph LR
-    A[DumpFile.txt] -->|txt_to_csv.py| B[Network_Analysis.csv]
-    B -->|csv_to_md.py| C[Network_Report.md]
-    C -->|md_to_html.py| D[Network_Report.html]
-    B --> E[Excel Analysis]
-📁 Project structure
-File	Purpose
-DumpFile.txt	Example raw dump from tcpdump command
-txt_to_csv.py	Extraction, parsing, and cleanup → CSV output
-csv_to_md.py	Security analysis → generate Markdown report
-md_to_html.py	Convert Markdown report → styled HTML
-Network_Analysis.csv	Structured data (Excel/Pandas ready)
-Network_Report.md	Security analysis report (Markdown format)
-Network_Report.html	Final styled report (HTML format)
-README.md	User manual (English, this file)
-🛠️ Requirements
-Python 3.x (tested on Python 3.8+)
+Use this checklist to ensure your repository meets grading expectations:
 
-Standard library only — no external packages required
+- [ ] Code present and runnable (`txt_to_csv.py`, `csv_to_md.py`, `md_to_html.py`)
+- [ ] README in English with installation, usage, expected outputs
+- [ ] Sample input file (`DumpFileB2.txt`) and outputs included
+- [ ] Demo script (`run_report.py`) that runs the full pipeline
+- [ ] Evidence of testing (unit tests or fixtures) in `/tests` or `/fixtures`
+- [ ] Presentation notes/slides (12 minutes) and demo plan
+- [ ] Code quality: docstrings, readable variable names, inline comments
+- [ ] Excel analysis of CSV file (charts, pivot tables)
+- [ ] README links project deliverables to competencies (AC03.11–AC03.16)
 
-os, csv, re, collections, argparse, datetime
+---
 
-Optional: Excel for manual CSV analysis
+## 📖 Project overview
 
-🚀 Quick start
-Run the full pipeline from the project root directory:
+**NetTrace Investigator** is a compact Python toolchain that converts raw `tcpdump` output into an actionable network security report (CSV → Markdown → HTML).
 
-bash
-# Step 1: Convert raw dump to CSV
+**Goal:** Transform hard-to-read packet dumps into clear, structured outputs highlighting:
+- SSH brute force attacks
+- Port scanning activity
+- ICMP floods (DoS)
+- Top bandwidth consumers
+
+This project was developed to investigate network saturation issues when traditional methods failed, by processing `tcpdump` logs through automated Python analysis.
+
+---
+
+## ✅ Prerequisites
+
+- **Python 3.8 or newer**
+- Place `DumpFileB2.txt` (or your tcpdump export) in the project root directory
+- **No external packages required** (standard library only: `os`, `csv`, `re`, `collections`, `datetime`)
+- **Optional:** Microsoft Excel for manual CSV analysis
+
+---
+
+## 🚀 Quick install & run (pipeline)
+
+### Option 1: Run each script manually
+
+```bash
+# Step 1: Parse raw dump → CSV
 python txt_to_csv.py
-# → Generates Network_Analysis.csv
+# → Creates Network_Analysis.csv (delimiter: `;`)
 
-# Step 2: Analyze CSV and generate Markdown report
+# Step 2: Analyze CSV → Markdown report
 python csv_to_md.py
-# → Generates Network_Report.md
+# → Creates Network_Report.md
 
-# Step 3: Convert Markdown to HTML
+# Step 3: Convert Markdown → HTML
 python md_to_html.py
-# → Generates Network_Report.html
-Each script can be executed separately if you only need a specific step.
-
-📖 Usage (detailed)
-1️⃣ txt_to_csv.py - Extract data from raw dump
-Input: DumpFile.txt (raw tcpdump output)
-Output: Network_Analysis.csv (structured data)
-
+# → Creates Network_Report.html
+Option 2: Run entire pipeline in one command
 bash
-python txt_to_csv.py [--input DumpFile.txt] [--output Network_Analysis.csv]
-What it does:
+python run_report.py
+# → Executes all 3 steps automatically
+🧩 Scripts & file descriptions
+File	Purpose
+DumpFileB2.txt	Raw tcpdump export (input)
+txt_to_csv.py	Parse dump → extract timestamps, IPs, ports, flags, lengths → write CSV
+csv_to_md.py	Analyze CSV → detect attacks, top talkers → generate Markdown report
+md_to_html.py	Convert Markdown → styled HTML with embedded CSS
+Network_Analysis.csv	Structured data (delimiter: ;) - Excel ready
+Network_Report.md	Security analysis report (Markdown format)
+Network_Report.html	Final styled report (standalone HTML)
+run_report.py	(Optional) Run full pipeline in one command
+🔍 Security analysis - Detection thresholds
+The tool uses threshold-based heuristics to detect suspicious patterns:
 
-Parses each line of the tcpdump output
+1. Critical Threat: Targeted SSH Attack
+🔴 Main Assault: 192.168.190.130 (66 packets). Brute Force confirmed.
 
-Extracts: timestamp, source IP, source port, destination IP, destination port, protocol, TCP flags
+Threshold: More than 50 SSH connection attempts (port 22) from a single source IP
 
-Cleans and normalizes data
+Logic: Groups SSH packets by source IP and timestamp, flags IPs exceeding threshold
 
-Exports to CSV format with proper headers
+Detected: 66 connection attempts from 192.168.190.130 to port 22
 
-2️⃣ csv_to_md.py - Analyze and generate report
-Input: Network_Analysis.csv
-Output: Network_Report.md
+Recommendation: Block source IP immediately and enable fail2ban
 
-bash
-python csv_to_md.py [--input Network_Analysis.csv] [--output Network_Report.md]
-What it does:
+2. Other Detected Anomalies
+⚠️ Port Scanning
+Host probed 135 different ports.
 
-Loads CSV data
+Threshold: A single source IP connects to more than 20 different destination ports on the same target
 
-Applies security detection algorithms (SSH brute force, port scans, SYN floods)
+Logic: Analyzes unique (src_ip, dst_ip, dst_port) combinations
 
-Identifies unencrypted traffic and top talkers
+Detected: Scanning activity targeting 135 unique ports
 
-Generates structured Markdown report with executive summary, alerts, and recommendations
+Recommendation: Investigate source host for compromise, implement port knocking
 
-3️⃣ md_to_html.py - Convert to HTML
-Input: Network_Report.md
-Output: Network_Report.html
+⚠️ ICMP Flood
+84 packets detected. Potential DoS.
 
-bash
-python md_to_html.py [--input Network_Report.md] [--output Network_Report.html]
-What it does:
+Threshold: More than 50 ICMP packets in a short time frame
 
-Converts Markdown to HTML with embedded CSS
+Logic: Counts ICMP echo requests per source
 
-Applies professional styling (headers, tables, code blocks)
+Detected: 84 ICMP packets indicating flood attempt
 
-Creates a standalone HTML file ready for sharing or presentation
+Recommendation: Rate-limit ICMP traffic, block suspicious sources
 
-📊 Output format & examples
+Additional Detection Capabilities
+Unencrypted Traffic Detection
+Ports monitored: HTTP (80), Telnet (23), FTP (21)
+
+Recommendation: Migrate to HTTPS, SSH, SFTP
+
+Top Talkers Analysis
+Lists most active IPs by packet count
+
+Identifies bandwidth hogs or compromised hosts
+
+🔎 Input / Output formats and examples
 CSV Structure
-Expected CSV header:
+Header (delimiter ;):
 
 text
-timestamp,src_ip,src_port,dst_ip,dst_port,protocol,flags,info
+Timestamp;Source_IP;Source_Port;Dest_IP;Dest_Port;Flags;Length;Packet_Info
 Example row:
 
 text
-2025-01-10 14:23:45,192.168.1.100,52341,10.0.0.5,22,TCP,S,SSH connection attempt
+15:34:04.766656;192.168.1.100;52341;10.0.0.5;22;S;60;SSH connection attempt
 Markdown Report Example
+The generated report includes:
+
 text
 ## 🚨 Critical Alerts
 
-### SSH Brute Force Detected
-- **Source IP:** 192.168.190.130
-- **Attempts:** 66 connection attempts in 5 minutes
-- **Target:** 10.0.0.5:22
-- **Recommendation:** Block source IP and enable fail2ban
+### 1. Critical Threat: Targeted SSH Attack
+🔴 **Main Assault**: `192.168.190.130` (66 packets). Brute Force confirmed.
+
+### 2. Other Detected Anomalies
+⚠️ **Port Scanning**: Host probed **135** different ports.
+⚠️ **ICMP Flood**: 84 packets detected. Potential DoS.
 HTML Report
 The HTML output includes:
 
-✅ Professional styling with headers and color-coded sections
+✅ Professional styling with Bootstrap + embedded CSS
+
+✅ Color-coded sections (🔴 critical alerts, ⚠️ warnings)
 
 ✅ Tables for structured data
 
-✅ Embedded CSS (no external dependencies)
+✅ Standalone file (no external dependencies)
 
 ✅ Ready for presentation or email sharing
 
-📈 Excel Analysis
-The generated Network_Analysis.csv can be imported into Excel for additional analysis:
+📈 Excel analysis
+The generated Network_Analysis.csv (delimiter ;) can be imported into Excel for additional analysis:
 
-Open Excel and import Network_Analysis.csv
+Import steps:
+Open Excel → Data → Get Data → From Text/CSV
 
-Create pivot tables to analyze:
+Select Network_Analysis.csv
 
+Choose delimiter: semicolon (;)
+
+Import data
+
+Recommended analyses:
+Pivot Tables:
 Traffic volume by IP address
 
 Port usage distribution
 
 Timeline of suspicious activity
 
-Generate charts:
+Charts:
+Top 10 source IPs by packet count (horizontal bar chart)
 
-Top 10 source IPs by packet count
+Protocol distribution (pie chart: TCP vs UDP vs ICMP)
 
-Protocol distribution (TCP vs UDP)
+Hourly traffic patterns (line chart: packets per hour)
 
-Hourly traffic patterns
+Filters:
+Filter by port 22 (SSH) to analyze brute force attempts
 
-🔧 Development & Contributing
-Code Structure
-Modular design: Each script handles one specific transformation
+Filter by protocol ICMP to visualize flood patterns
 
-Standard library only: No external dependencies for easy deployment
+Filter by unique destination ports to identify port scans
 
-CLI arguments: Flexible input/output paths using argparse
+🎯 How to prepare the demo (12-minute presentation)
+Timeline structure:
+Time	Content
+0:00–1:30	Context: Problem (network saturation), data source (tcpdump)
+1:30–4:00	Demo: Run txt_to_csv.py, show Network_Analysis.csv structure
+4:00–7:00	Analysis: Run csv_to_md.py, open Network_Report.md, highlight alerts
+7:00–9:00	Visualization: Convert to HTML, show styled report and recommendations
+9:00–11:00	Technical details: Explain thresholds (66 SSH, 135 ports, 84 ICMP), detection logic
+11:00–12:00	Conclusion: Results summary, limitations, future improvements
+Key points to demonstrate:
+Identified threats:
 
-PEP8 compliant: Clean, readable Python code with docstrings
+SSH brute force: 66 packets from 192.168.190.130
 
-Testing
-Add test fixtures under tests/ directory
+Port scanning: 135 ports probed
 
-Provide sample DumpFile.txt with known attack patterns
+ICMP flood: 84 packets detected
 
-Verify detection accuracy against expected results
+Excel analysis:
 
-Contribution Guidelines
+Show pivot table with top IPs
+
+Display chart of protocol distribution
+
+Demonstrate filtering capabilities
+
+Competencies demonstrated:
+
+AC03.11: Python + Git usage
+
+AC03.12: Code modification and debugging
+
+AC03.13: Algorithm implementation (threshold detection)
+
+AC03.14: Web technologies (MD → HTML)
+
+AC03.15: Data structures (CSV, dictionaries)
+
+AC03.16: GitHub collaboration
+
+Prepare 3–4 slides:
+SAE context + problematic (network saturation)
+
+Pipeline diagram (Dump → CSV → MD → HTML)
+
+Screenshot of Network_Report.html with alerts highlighted
+
+Results summary + competencies demonstrated
+
+⚠️ Troubleshooting
+Problem	Solution
+FileNotFoundError: DumpFileB2.txt	Ensure file exists in project root
+Empty CSV output	Confirm dump contains lines with IP keyword
+Encoding errors	Files are written in UTF-8, verify text editor encoding
+Markdown not converting	Check Network_Report.md exists before running md_to_html.py
+Wrong CSV delimiter in Excel	Select semicolon (;) as delimiter during import
+🧪 Testing & fixtures
+Recommended test structure:
+text
+/fixtures/
+  DumpFileB2_sample.txt       # Small sample dump (10-20 lines)
+  Network_Analysis_sample.csv # Expected CSV output
+  Network_Report_sample.md    # Expected Markdown output
+
+/tests/
+  test_txt_to_csv.py          # Unit tests for parsing functions
+  test_csv_to_md.py           # Unit tests for detection algorithms
+  test_integration.py         # Full pipeline test on sample data
+Running tests:
+bash
+python -m unittest discover tests/
+🤝 Contributing
 Fork the repository
 
 Create a feature branch: git checkout -b feature/new-detection
@@ -250,34 +320,21 @@ Commit small, focused changes with clear messages
 
 Submit a pull request with detailed description
 
-Future Improvements
-🔹 Add CLI filters for time ranges and specific IPs
+Future improvements:
+🔹 CLI arguments (--input, --output) for flexibility
 
-🔹 Export results to JSON format for integration with SIEM tools
+🔹 JSON export for SIEM integration
 
-🔹 Implement machine learning for anomaly detection
+🔹 Machine learning anomaly detection
 
-🔹 Add real-time monitoring mode for live tcpdump feeds
+🔹 Real-time monitoring mode for live tcpdump feeds
 
-🔹 Create web dashboard for interactive visualization
+🔹 Web dashboard with interactive visualizations
 
-🎓 Learning Outcomes
-This project demonstrates:
+🔹 Configurable thresholds (SSH attempts, port scan count, ICMP limit)
 
-✅ AC03.11: Use of Python, Git, and command-line tools
-
-✅ AC03.12: Reading, modifying, and debugging Python programs
-
-✅ AC03.13: Translating security analysis logic into Python algorithms
-
-✅ AC03.14: Understanding web technologies (Markdown → HTML conversion)
-
-✅ AC03.15: Choosing appropriate data structures (CSV, dictionaries, lists)
-
-✅ AC03.16: Using GitHub for collaborative development and version control
-
-📜 License & Contact
-License: This project is provided as-is for educational purposes (SAE 1.05)
+📜 License & contact
+License: MIT (or specify if required by instructor)
 
 Author: Khadim Diagne
 
